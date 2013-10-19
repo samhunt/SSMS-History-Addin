@@ -35,6 +35,18 @@ namespace SSMSHistory
             _server = _database = _table = _username = _password = "";
         }
 
+        public InputBoxForm(string server, string database, string table, string username, string password){
+            InitializeComponent();
+            
+            serverTextBox.Text = server;
+            databaseTextBox.Text = database;
+            tableTextBox.Text = table;
+            usernameTextBox.Text = username;
+            passwordTextBox.Text = password;
+
+            _server = _database = _table = _username = _password = "";
+        }
+
         private void InputBox_Load(object sender, EventArgs e)
         {
 
@@ -42,9 +54,9 @@ namespace SSMSHistory
 
         private void button1_Click(object sender, EventArgs e)
         {
-            if (serverLabel.Text.Equals("") || databaseLabel.Text.Equals("") ||
-                    tableLabel.Text.Equals("") || usernameLabel.Text.Equals("") ||
-                    passwordLabel.Text.Equals(""))
+            if (String.IsNullOrEmpty(serverTextBox.Text) || String.IsNullOrEmpty(databaseTextBox.Text) ||
+                    String.IsNullOrEmpty(tableTextBox.Text) || String.IsNullOrEmpty(usernameTextBox.Text) ||
+                    String.IsNullOrEmpty(passwordTextBox.Text))
             {
                 MessageBox.Show("You must fill out all fields");
             }

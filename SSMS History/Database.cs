@@ -65,9 +65,9 @@ namespace SSMSHistory
                 _running = true;
             }
 
-            if (_running)
+            while (_running)
             {
-                if (!DatabaseExists() && _server.Equals("(local)"))
+                if (_server.Equals("(local)") && !DatabaseExists())
                 {
                     CreateDatabase();
                 }
@@ -81,13 +81,12 @@ namespace SSMSHistory
                 {
                     CreateTables();
                 }
+                break;
             }
         }
 
         private void LoadConfig()
         {
-            //bool populated = false;
-
             //check if the file already exists, if it exists load the file, if not, create the new file and populate the file.
             XDocument document;
             XElement root = null;
@@ -97,37 +96,43 @@ namespace SSMSHistory
                 document = XDocument.Load(_xmlFile);
                 root = document.Root;
 
-                if (root.Name.LocalName.Equals("config"))
+                if (root.Name.LocalName.Equals("config") && root.HasElements)
                 {
-                    if (root.HasElements)
+                    _server = GetElement(root, "server");
+                    _databaseName = GetElement(root, "databaseName");
+                    _tableName = GetElement(root, "tableName");
+                    _username = GetElement(root, "username");
+                    _password = GetElement(root, "password");
+                    //document.Save(_xmlFile);
+
+                    if (_server == null || _databaseName == null || _tableName == null || _username == null || _password == null)
                     {
-                        _server = GetElement(root, "server");
-                        _databaseName = GetElement(root, "databaseName");
-                        _tableName = GetElement(root, "tableName");
-                        _username = GetElement(root, "username");
-                        _password = GetElement(root, "password");
-                        document.Save(_xmlFile);
+                        CreateConfigForm(_server, _databaseName, _tableName, _username, _password);
+                        LoadConfig();
                     }
+
                 }
             }else
             {
-                CreateConfig();
+                CreateConfigForm();
                 LoadConfig();
             }
-            _connectionString = "server=" + _server + ";User ID =" + _username + ";Password=" + _password + ";";
+            _connectionString = "server=" + _server + ";User ID=" + _username + ";Password=" + _password + ";";
         }
 
         private string GetElement(XElement node, string element)
         {
             var elem = node.Element(element);
-            string result = elem.Value;
-            if(result == null) //ask the user for the correct value and add the element to the file, then return the value.
+            string value;
+            if(elem != null)
             {
-                XElement xElement = new XElement(element, "test");
-                node.Add(xElement);
+                value = elem.Value;
             }
-            
-            return result;
+            else
+            {
+                value = null;
+            }
+            return value;
         }
 
         private XElement CreateElement(InputBoxForm form, string element)
@@ -159,11 +164,20 @@ namespace SSMSHistory
         }
 
 
-        private void CreateConfig()
+        private void CreateConfigForm()
         {
             InputBoxForm form = new InputBoxForm();
             form.ShowDialog();
+            CreateConfig(form);
+        }
 
+        private void CreateConfigForm(string server, string database, string table, string username, string password){
+            InputBoxForm form = new InputBoxForm(server, database, table, username, password);
+            form.ShowDialog();
+            CreateConfig(form);
+        }
+
+        private void CreateConfig(InputBoxForm form){
             XElement server = CreateElement(form, "server");
             XElement databaseName = CreateElement(form, "databaseName");
             XElement tableName = CreateElement(form, "tableName");
@@ -178,6 +192,7 @@ namespace SSMSHistory
             document.Root.Add(password);
             document.Save(_xmlFile);
         }
+
 
         public bool Running()
         {
@@ -202,6 +217,10 @@ namespace SSMSHistory
                     _running = false;
                 }
             }
+            else if (_server.Equals("(local)"))
+            {
+                _running = false;
+            }
             else
             {
                 _running = true;
@@ -212,7 +231,7 @@ namespace SSMSHistory
 
         public void InsertQuery(string query_text, string file_contents, string file_name, string server, string server_dot, string db, string user_name)
         {
-            string query = "INSERT @tableName (" +
+            string query = "INSERT "+ _tableName + " (" +
                            "       query," +
                            "       file_contents," +
                            "       file_name," +
@@ -231,7 +250,6 @@ namespace SSMSHistory
             using (SqlConnection conn = new SqlConnection(_connectionString))
             {
                 SqlCommand cmd = new SqlCommand(query, conn);
-                cmd.Parameters.AddWithValue("@tableName", _tableName);
                 cmd.Parameters.AddWithValue("@query_text", query_text);
                 cmd.Parameters.AddWithValue("@file_contents", file_contents);
                 cmd.Parameters.AddWithValue("@file_name", file_name);
@@ -261,7 +279,7 @@ namespace SSMSHistory
 
         private void CreateTables()
         {
-            string query = "CREATE TABLE @tableName (" +
+            string query = "CREATE TABLE " + _tableName + " (" +
                            "       id              NUMERIC(18,0) IDENTITY," +
                            "       query           VARCHAR(Max)," +
                            "       file_contents   VARCHAR(Max)," +
@@ -279,7 +297,6 @@ namespace SSMSHistory
                 {
                     conn.Open();
                     SqlCommand cmd = new SqlCommand(query, conn);
-                    cmd.Parameters.AddWithValue("@tableName", _tableName);
                     cmd.ExecuteNonQuery();
 
                     conn.Close();
@@ -300,12 +317,12 @@ namespace SSMSHistory
                     System.IO.Directory.CreateDirectory("C:\\Database");
                 }
 
-                string query = "CREATE DATABASE @databaseName ON PRIMARY (" +
-                               "NAME = @databaseName," +
-                               "FILENAME = 'C:\\Database\\@databaseName" + "eData.mdf'," +
+                string query = "CREATE DATABASE " + _databaseName + " ON PRIMARY (" +
+                               "NAME = " + _databaseName + "," +
+                               "FILENAME = 'C:\\Database\\" + _databaseName + "eData.mdf'," +
                                "SIZE = 4096KB, FILEGROWTH = 10%)" +
-                               "LOG ON (NAME = @databaseName " + "_Log," +
-                               "FILENAME = 'C:\\Database\\@databaseName" + "Log.ldf'," +
+                               "LOG ON (NAME = " + _databaseName + "_Log," +
+                               "FILENAME = 'C:\\Database\\" + _databaseName + "Log.ldf'," +
                                "SIZE = 4MB," +
                                "FILEGROWTH = 10%)";
 
@@ -315,7 +332,6 @@ namespace SSMSHistory
                 {
                     conn.Open();
                     SqlCommand cmd = new SqlCommand(query, conn);
-                    cmd.Parameters.AddWithValue("@databaseName", _databaseName);
                     cmd.ExecuteNonQuery();
 
                     conn.Close();
@@ -353,6 +369,7 @@ namespace SSMSHistory
             }
             catch
             {
+                _running = false;
                 exists = false;
             }
             return exists;
@@ -384,6 +401,7 @@ namespace SSMSHistory
             }
             catch
             {
+                _running = false;
                 exists = false;
             }
             return exists;
